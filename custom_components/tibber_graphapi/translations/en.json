@@ -1,0 +1,46 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Integration is already configured"
+    },
+    "error": {
+      "login_failed": "Login failed - please check host and/or password",
+      "cannot_connect": "Failed to connect",
+      "unknown": "Unknown error",
+      "no_data": "Could not read any data from device",
+      "unknown_mode": "Please check the IP/host or the provided Node Number - if you are sure that your information is correct, then the Tibber Pulse is communicating via an not-yet-implemented protocol - please create DEBUG log output and open an issue@github - I need sample data - TIA"
+    },
+    "step": {
+      "user": {
+        "description": "Please specify the local connection information for your Tibber Pulse Bridge.\n\n\nYou must have enabled the 'webserver_force_enable' flag!\n\n\nIf you need help with the configuration have a look at: https://github.com/marq24/ha-tibber-graphapi",
+        "data": {
+          "name": "Display name",
+          "username": "Your Tibber account name (eMail)",
+          "password": "Your Tibber password - [this will be stored as plaintext in ha configuration]",
+          "scan_interval": "Polling Interval in seconds",
+          "vehicle_index_number": "Vehicle Index (expert setting)"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "user": {
+        "description": "If you need help with the configuration have a look here: https://github.com/marq24/ha-tibber-graphapi",
+        "data": {
+          "name": "Display name",
+          "username": "Your Tibber account name (eMail)",
+          "password": "Your Tibber password - [this will be stored as plaintext in ha configuration]",
+          "scan_interval": "Polling Interval in seconds",
+          "vehicle_index_number": "Vehicle Index (expert setting)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "soc": {"name": "Battery Level"},
+      "range": {"name": "Range"}
+    }
+  }
+}

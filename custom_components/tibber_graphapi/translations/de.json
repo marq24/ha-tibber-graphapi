@@ -1,0 +1,46 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Integration ist bereits eingerichtet"
+    },
+    "error": {
+      "login_failed": "Login fehlgeschlagen – bitte Host und/oder Passwort prüfen",
+      "cannot_connect": "Keine Verbindung möglich",
+      "unknown": "Unbekannter Fehler",
+      "no_data": "Es konnten keine Daten abgerufen werden",
+      "unknown_mode": "Bitte prüfe die IP/Host bzw. die Node-Nummer - wenn Du dir sicher bist, dass Deine Informationen korrekt sind, dann kommuniziert der Tibber Pulse über ein noch nicht implementiertes Protokoll. Bitte erstell doch bitte auf GitHub ein Issue mit entsprechenden DEBUG-Log Informationen - ich benötige Beispieldaten. Danke im Voraus!"
+    },
+    "step": {
+      "user": {
+        "description": "Bitte gib die lokalen Verbindungsdaten zu Deiner Tibber Pulse Bridge an.\n\n\nDu musst zuvor das 'webserver_force_enable'-Flag aktiviert haben!\n\n\nZusätzliche Informationen zur Einrichtung findest Du hier: https://github.com/marq24/ha-tibber-graphapi",
+        "data": {
+          "name": "Anzeigename",
+          "username": "Tibber Benutzername (E-Mail)",
+          "password": "Tibber-Passwort (das Passwort wird im Klartext in der HA-Konfiguration gespeichert!)",
+          "scan_interval": "Aktualisierungsintervall in Sekunden",
+          "vehicle_index_number": "Fahrzeug Index (Experteneinstellung)"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "user": {
+        "description": "Wenn Du Hilfe benötigst, findest Du sie hier: https://github.com/marq24/ha-tibber-graphapi",
+        "data": {
+          "name": "Anzeigename",
+          "username": "Tibber Benutzername (E-Mail)",
+          "password": "Tibber-Passwort (das Passwort wird im Klartext in der HA-Konfiguration gespeichert!)",
+          "scan_interval": "Aktualisierungsintervall in Sekunden",
+          "vehicle_index_number": "Fahrzeug Index (Experteneinstellung)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "soc": {"name": "Akku-Ladestand"},
+      "range": {"name": "Reichweite"}
+    }
+  }
+}
