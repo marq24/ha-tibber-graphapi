@@ -1,3 +1,4 @@
+from custom_components.tibber_graphapi.tags import TGATag
 from typing import Final
 
 from homeassistant.components.sensor import (
@@ -25,10 +26,13 @@ DEFAULT_VEHINDEX_NUMBER = 0
 # for evcc we need the following sensor types!
 # https://docs.evcc.io/docs/devices/vehicles#manuell
 
-SENSOR_TYPES = [
+class ExtSensorEntityDescription(SensorEntityDescription, frozen_or_thawed=True):
+    tag: TGATag | None = None
 
-    SensorEntityDescription(
-        key="soc",
+SENSOR_TYPES = [
+    ExtSensorEntityDescription(
+        tag=TGATag.VEH_SOC,
+        key=TGATag.VEH_SOC.key,
         name="Battery Level",
         icon="mdi:car-electric-outline",
         device_class=None,
@@ -36,8 +40,9 @@ SENSOR_TYPES = [
         native_unit_of_measurement=PERCENTAGE,
         suggested_display_precision=0
     ),
-    SensorEntityDescription(
-        key="range",
+    ExtSensorEntityDescription(
+        tag=TGATag.VEH_RANGE,
+        key=TGATag.VEH_RANGE.key,
         name="Range",
         icon="mdi:ev-station",
         device_class=None,
