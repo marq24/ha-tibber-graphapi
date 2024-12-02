@@ -98,7 +98,7 @@ class TibberGraphApiDataUpdateCoordinator(DataUpdateCoordinator):
 
         # support for systems where vehicle index is not 0
         self.bridge = TibberGraphApiBridge(user=self._user, pwd=the_pwd,
-                                           websession=async_get_clientsession(hass),
+                                           a_web_session=async_get_clientsession(hass),
                                            veh_index=self._vehicle_index,
                                            veh_id=self._vehicle_id)
 
@@ -136,16 +136,29 @@ class TibberGraphApiDataUpdateCoordinator(DataUpdateCoordinator):
             "name": f"Tibber GraphAPI {self._vehicle_name}"
         }
 
+    async def async_refresh_with_pause(self):
+        await asyncio.sleep(5)
+        await self.async_refresh()
+
     async def _async_update_data(self):
         _LOGGER.debug(f"_async_update_data called")
         try:
             result = await self.bridge.update()
             if result is not None:
                 _LOGGER.debug(f"number of fields after query: {len(result)}")
+            else:
+                if self.bridge.should_be_refreshed():
+                    _LOGGER.debug(f"we going to call async_refresh_with_pause() again")
+                    try:
+                        asyncio.create_task(self.async_refresh_with_pause())
+                    except Exception as exc:
+                        _LOGGER.debug(f"Exception while try to call 'asyncio.create_task(self.async_refresh_with_pause())': {exc}")
+
             return result
 
         except UpdateFailed as exception:
             raise UpdateFailed() from exception
+
         except Exception as other:
             _LOGGER.warning(f"unexpected: {other}")
             raise UpdateFailed() from other
@@ -226,7 +239,6 @@ class TibberGraphApiEntity(Entity):
         return False
 
 
-
 class TibberGraphApiBridge:
     # https://app.tibber.com/v4/gql
 
@@ -241,19 +253,20 @@ class TibberGraphApiBridge:
         "Content-Type": "application/x-www-form-urlencoded"
     }
 
-    a_refresh_token = None
     tibber_vehicleId = None
     tibber_vehicleName = None
 
-    _websession = None
+    _require_refresh = False
+    _the_refresh_token = None
+    _web_session = None
     _user = None
     _pwd = None
     _veh_index = 0
 
-    def __init__(self, user, pwd, websession, veh_index: int = 0, veh_id: str = None, options: dict = None):
-        if websession is not None:
+    def __init__(self, user, pwd, a_web_session, veh_index: int = 0, veh_id: str = None, options: dict = None):
+        if a_web_session is not None:
             _LOGGER.info(f"restarting TibberGraphApi integration... for tibber-vehicle-id: '{veh_id}' vehicle-index: '{veh_index}' with options: {options}")
-            self._websession = websession
+            self._web_session = a_web_session
             self._user = user
             self._pwd = pwd
             self._veh_index = veh_index
@@ -261,12 +274,15 @@ class TibberGraphApiBridge:
                 self.tibber_vehicleId = veh_id
 
     async def update(self) -> dict:
-        return await self.get_vehicle_data(self._websession)
+        return await self.get_vehicle_data()
+
+    def should_be_refreshed(self) -> bool:
+        return self._require_refresh or "Authorization" not in self.REQ_HEADERS
 
     async def login(self) -> None:
         self.REQ_HEADERS["Content-Type"] = "application/x-www-form-urlencoded"
         login_data = f"email={self._user}&password={self._pwd}"
-        async with self._websession.post(self.LOGIN_URL, data=login_data, headers=self.REQ_HEADERS) as response:
+        async with self._web_session.post(self.LOGIN_URL, data=login_data, headers=self.REQ_HEADERS) as response:
             if response.status == 200:
                 data = await response.json()
 
@@ -275,34 +291,56 @@ class TibberGraphApiBridge:
                 self.REQ_HEADERS["Authorization"] = data["token"]
                 if "refreshToken" in data:
                     _LOGGER.debug(f"refreshToken received")
-                    self.a_refresh_token = data["refreshToken"]
+                    self._the_refresh_token = data["refreshToken"]
+                    self._require_refresh = False
             else:
                 self.REQ_HEADERS["Content-Type"] = "application/json; charset=utf-8"
-                _LOGGER.error(f"{response.status} -> {response.reason}")
+                _LOGGER.warning(f"login {response.status} -> {response.reason}")
 
-    async def get_vehicle_id(self) -> str:
-        if "Authorization" not in self.REQ_HEADERS:
-            await self.login()
+    async def refresh_token(self) -> None:
+        if self._the_refresh_token is not None:
+            self.REQ_HEADERS["Authorization"] = self._the_refresh_token
+            self.REQ_HEADERS["Content-Type"] = "application/json; charset=utf-8"
+            async with self._web_session.put(self.REFRESH_URL, headers=self.REQ_HEADERS) as response:
+                if response.status == 200:
+                    ref_data = None
+                    ref_text = None
+                    if response.headers["Content-Type"] == "application/json":
+                        ref_data = await response.json()
+                    else:
+                        # we try to parse the text as json ?!
+                        ref_text = await response.text()
+                        try:
+                            ref_data = json.loads(ref_text)
+                        except Exception as other:
+                            _LOGGER.warning(f"could not parse refresh response: {other} {ref_text}")
 
-        jdata = {
-            "query": "query getVehicles {me {myVehicles {vehicles {id, title} } } }"
-        }
-        async with self._websession.post(self.DATA_URL, json=jdata, headers=self.REQ_HEADERS) as response:
-            if response.status == 200:
-                data = await response.json()
-                if "data" in data \
-                        and "me" in data["data"] \
-                        and "myVehicles" in data["data"]["me"] \
-                        and "vehicles" in data["data"]["me"]["myVehicles"] \
-                        and len(data["data"]["me"]["myVehicles"]["vehicles"]) > self._veh_index:
-                    self.tibber_vehicleId = data["data"]["me"]["myVehicles"]["vehicles"][self._veh_index]["id"]
-                    self.tibber_vehicleName = data["data"]["me"]["myVehicles"]["vehicles"][self._veh_index]["title"]
+                    if ref_data is not None and "token" in ref_data:
+                        self._require_refresh = False
+                        self.REQ_HEADERS["Authorization"] = ref_data["token"]
+                        if "refreshToken" in ref_data:
+                            _LOGGER.debug(f"refreshToken updated !")
+                            self._the_refresh_token = ref_data["refreshToken"]
+                        else:
+                            _LOGGER.warning(f"not refreshToken provided !")
+                            self._the_refresh_token = None
+                    else:
+                        _LOGGER.warning(f"no valid data in refresh token response: {ref_data} {ref_text}")
+                        self._require_refresh = False
+                        self.REQ_HEADERS.pop("Authorization")
                 else:
-                    _LOGGER.error(f"Could not find vehicle id in response: {data}")
-            else:
-                _LOGGER.error(f"{response.status} -> {response.reason}")
+                    _LOGGER.warning(f"refresh_token: {response.status} -> {response.reason}")
+                    self._require_refresh = False
+                    self.REQ_HEADERS.pop("Authorization")
+        else:
+            _LOGGER.warning(f"refresh token was called but the 'refresh_token' is NONE")
+            self._require_refresh = False
+            self.REQ_HEADERS.pop("Authorization")
 
-    async def get_vehicle_data(self, session) -> dict:
+    async def get_vehicle_data(self) -> dict:
+        if self._require_refresh:
+            await self.refresh_token()
+
         if "Authorization" not in self.REQ_HEADERS:
             await self.login()
 
@@ -319,51 +357,48 @@ class TibberGraphApiBridge:
                      "} } }"
         }
 
-        async with session.post(self.DATA_URL, json=jdata, headers=self.REQ_HEADERS) as response:
+        async with self._web_session.post(self.DATA_URL, json=jdata, headers=self.REQ_HEADERS) as response:
             if response.status == 401:
                 _LOGGER.debug(f"401 received - trying to refresh auth token")
-                if self.a_refresh_token is None:
-                    _LOGGER.warning(f"no refresh token available")
-                    await self.login()
-                    return await self.get_vehicle_data(session)
+                if self._the_refresh_token is None:
+                    _LOGGER.warning(f"no refresh token available - wait for next call to re-login...")
+                    self._require_refresh = False
+                    self.REQ_HEADERS.pop("Authorization")
                 else:
-                    self.REQ_HEADERS["Authorization"] = self.a_refresh_token
-                    self.REQ_HEADERS["Content-Type"] = "application/json; charset=utf-8"
-                    async with session.put(self.REFRESH_URL, json=jdata, headers=self.REQ_HEADERS) as refresh_response:
-                        if refresh_response.status == 200:
-                            ref_data = None
-                            ref_text = None
-                            if refresh_response.headers["Content-Type"] == "application/json":
-                                ref_data = await refresh_response.json()
-                            else:
-                                # we try to parse the text as json ?!
-                                ref_text = await refresh_response.text()
-                                try:
-                                    ref_data = json.loads(ref_text)
-                                except Exception as other:
-                                    _LOGGER.warning(f"could not parse refresh response: {other} {ref_text}")
-
-                            if ref_data is not None and "token" in ref_data:
-                                self.REQ_HEADERS["Authorization"] = ref_data["token"]
-                                if "refreshToken" in ref_data:
-                                    _LOGGER.debug(f"refreshToken updated !")
-                                    self.a_refresh_token = ref_data["refreshToken"]
-                            else:
-                                _LOGGER.error(f"no valid data in refresh token response: {ref_data} {ref_text}")
-                                await self.login()
-                        else:
-                            await self.login()
-
-                        return await self.get_vehicle_data(session)
+                    _LOGGER.debug(f"refresh token available... try to refresh next...")
+                    self._require_refresh = True
 
             elif response.status == 200:
                 data = await response.json()
                 if "data" in data and "me" in data["data"] and "vehicle" in data["data"]["me"]:
                     return data["data"]["me"]["vehicle"]
-                else:
-                    return None
             else:
-                _LOGGER.error(f"{response.status} -> {response.reason}")
+                _LOGGER.warning(f"get_vehicle_data {response.status} -> {response.reason}")
+
+            # if we haven't read any data (cause of 401 or other status) we return None
+            return None
+
+    async def get_vehicle_id(self) -> str:
+        if "Authorization" not in self.REQ_HEADERS:
+            await self.login()
+
+        jdata = {
+            "query": "query getVehicles {me {myVehicles {vehicles {id, title} } } }"
+        }
+        async with self._web_session.post(self.DATA_URL, json=jdata, headers=self.REQ_HEADERS) as response:
+            if response.status == 200:
+                data = await response.json()
+                if "data" in data \
+                        and "me" in data["data"] \
+                        and "myVehicles" in data["data"]["me"] \
+                        and "vehicles" in data["data"]["me"]["myVehicles"] \
+                        and len(data["data"]["me"]["myVehicles"]["vehicles"]) > self._veh_index:
+                    self.tibber_vehicleId = data["data"]["me"]["myVehicles"]["vehicles"][self._veh_index]["id"]
+                    self.tibber_vehicleName = data["data"]["me"]["myVehicles"]["vehicles"][self._veh_index]["title"]
+                else:
+                    _LOGGER.warning(f"Could not find vehicle id in response: {data}")
+            else:
+                _LOGGER.warning(f"get_vehicle_id {response.status} -> {response.reason}")
 
     @property
     def vehicle_id(self):

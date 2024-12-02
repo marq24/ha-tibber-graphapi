@@ -55,7 +55,7 @@ class TibberLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def _test_connection_tibber_graphapi(self, user, pwd, veh_idx) -> bool:
         self._errors = {}
         try:
-            bridge = TibberGraphApiBridge(user=user, pwd=pwd, websession=async_get_clientsession(self.hass), veh_index=veh_idx)
+            bridge = TibberGraphApiBridge(user=user, pwd=pwd, a_web_session=async_get_clientsession(self.hass), veh_index=veh_idx)
             try:
                 await bridge.get_vehicle_id()
                 self._tibber_veh_id = bridge.vehicle_id
