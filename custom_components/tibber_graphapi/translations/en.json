@@ -44,8 +44,8 @@
     "sensor": {
       "range": {"name": "Range"},
       "soc": {"name": "Battery Level"},
-      "soc_max": {"name": "Battery Level min"},
-      "soc_min": {"name": "Battery Level max"},
+      "soc_max": {"name": "Battery Level max"},
+      "soc_min": {"name": "Battery Level min"},
       "evcc_charging_code": {"name": "EVCC Status code [A-F]"}
     }
   }

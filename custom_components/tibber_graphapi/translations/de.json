@@ -44,8 +44,8 @@
     "sensor": {
       "range": {"name": "Reichweite"},
       "soc": {"name": "Ladestand"},
-      "soc_max": {"name": "Ladestand min"},
-      "soc_min": {"name": "Ladestand max"},
+      "soc_max": {"name": "Ladestand max"},
+      "soc_min": {"name": "Ladestand min"},
       "evcc_charging_code": {"name": "EVCC Ladestatus-Code [A-F]"}
     }
   }
