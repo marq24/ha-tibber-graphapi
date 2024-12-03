@@ -15,7 +15,9 @@ class CAT(Enum):
 class ApiKey(NamedTuple):
     key: str
     cat: CAT
-    jpath: list[str]
+    jpath: list[str] = None
+    jkey: str = None
+    jvaluekey: str = None
     writeable: bool = False
     writeonly: bool = False
 
@@ -29,3 +31,5 @@ class TGATag(ApiKey, Enum):
 
     VEH_SOC = ApiKey(key="soc", cat=CAT.STATUS, jpath=["battery", "level"])
     VEH_RANGE = ApiKey(key="range", cat=CAT.STATUS, jpath=["battery", "estimatedRange"])
+    VEH_SOCMIN = ApiKey(key="soc_min", cat=CAT.STATUS, jkey="userSettings", jvaluekey="online.vehicle.smartCharging.minChargeLimit")
+    VEH_SOCMAX = ApiKey(key="soc_max", cat=CAT.STATUS, jkey="userSettings", jvaluekey="online.vehicle.smartCharging.targetBatteryLevel")

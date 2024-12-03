@@ -39,7 +39,9 @@
   },
   "entity": {
     "sensor": {
-      "soc": {"name": "Akku-Ladestand"},
+      "soc": {"name": "Ladestand"},
+      "soc_max": {"name": "Ladestand min"},
+      "soc_min": {"name": "Ladestand max"},
       "range": {"name": "Reichweite"}
     }
   }

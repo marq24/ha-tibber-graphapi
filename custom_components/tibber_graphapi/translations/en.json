@@ -40,6 +40,8 @@
   "entity": {
     "sensor": {
       "soc": {"name": "Battery Level"},
+      "soc_max": {"name": "Battery Level min"},
+      "soc_min": {"name": "Battery Level max"},
       "range": {"name": "Range"}
     }
   }

@@ -62,9 +62,17 @@ class TibberGraphApiSensor(TibberGraphApiEntity, SensorEntity, RestoreEntity):
     def native_value(self) -> StateType:
         try:
             if self.coordinator.data is not None:
-                if hasattr(self.entity_description, "tag") and self.entity_description.tag.jpath is not None and len(self.entity_description.tag.jpath) > 0:
-                    path = self.entity_description.tag.jpath
-                    return self.get_value_in_path(self.coordinator.data, path)
+                if hasattr(self.entity_description, "tag"):
+                    if self.entity_description.tag.jpath is not None and len(self.entity_description.tag.jpath) > 0:
+                        path = self.entity_description.tag.jpath
+                        return self.get_value_in_path(self.coordinator.data, path)
+                    elif self.entity_description.tag.jkey is not None:
+                        value = self.coordinator.data[self.entity_description.tag.jkey]
+                        if isinstance(value, list):
+                            if self.entity_description.tag.jvaluekey is not None:
+                                for item in value:
+                                    if item["key"] == self.entity_description.tag.jvaluekey:
+                                        return item["value"]
 
         except (IndexError, ValueError, TypeError):
             pass

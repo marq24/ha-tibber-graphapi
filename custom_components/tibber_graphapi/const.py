@@ -50,4 +50,25 @@ SENSOR_TYPES = [
         native_unit_of_measurement=UnitOfLength.KILOMETERS,
         suggested_display_precision=0
     ),
+    ExtSensorEntityDescription(
+        tag=TGATag.VEH_SOCMAX,
+        key=TGATag.VEH_SOCMAX.key,
+        name="SOC MAX",
+        icon="mdi:car-electric-outline",
+        device_class=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=0
+    ),
+    ExtSensorEntityDescription(
+        tag=TGATag.VEH_SOCMIN,
+        key=TGATag.VEH_SOCMIN.key,
+        name="SOC min",
+        icon="mdi:car-electric-outline",
+        device_class=None,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        suggested_display_precision=0
+    ),
+
 ]
