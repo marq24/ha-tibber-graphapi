@@ -7,8 +7,7 @@
       "login_failed": "Login failed - please check host and/or password",
       "cannot_connect": "Failed to connect",
       "unknown": "Unknown error",
-      "no_data": "Could not read any data from device",
-      "unknown_mode": "Please check the IP/host or the provided Node Number - if you are sure that your information is correct, then the Tibber Pulse is communicating via an not-yet-implemented protocol - please create DEBUG log output and open an issue@github - I need sample data - TIA"
+      "no_data": "Could not read any data from device"
     },
     "step": {
       "user": {
@@ -38,11 +37,16 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "enter_pincode": {"name": "PIN required"},
+      "alive": {"name": "alive"}
+    },
     "sensor": {
+      "range": {"name": "Range"},
       "soc": {"name": "Battery Level"},
       "soc_max": {"name": "Battery Level min"},
       "soc_min": {"name": "Battery Level max"},
-      "range": {"name": "Range"}
+      "evcc_charging_code": {"name": "EVCC Status code [A-F]"}
     }
   }
 }

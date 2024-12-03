@@ -15,19 +15,20 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import EntityDescription, Entity
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import (
+from custom_components.tibber_graphapi.const import (
     DOMAIN,
     MANUFACTURE,
+    PLATFORMS,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_VEHINDEX_NUMBER,
     CONF_VEHINDEX_NUMBER,
-    CONF_TIBBER_VEHICLE_ID, DEFAULT_VEHINDEX_NUMBER, CONF_TIBBER_VEHICLE_NAME
+    CONF_TIBBER_VEHICLE_ID,
+    CONF_TIBBER_VEHICLE_NAME
 )
 
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=10)
 CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({})}, extra=vol.ALLOW_EXTRA)
-
-PLATFORMS = ["sensor"]
 
 CC_P1: Final = re.compile(r"(.)([A-Z][a-z]+)")
 CC_P2: Final = re.compile(r"([a-z0-9])([A-Z])")

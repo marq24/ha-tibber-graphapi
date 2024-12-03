@@ -6,15 +6,8 @@ from typing import (
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
-class CAT(Enum):
-    CONFIG = "CONF"
-    STATUS = "STAT"
-    OTHER = "OTHE"
-    CONSTANT = "CONS"
-
 class ApiKey(NamedTuple):
     key: str
-    cat: CAT
     jpath: list[str] = None
     jkey: str = None
     jvaluekey: str = None
@@ -29,7 +22,10 @@ class TGATag(ApiKey, Enum):
     def __str__(self):
         return self.key
 
-    VEH_SOC = ApiKey(key="soc", cat=CAT.STATUS, jpath=["battery", "level"])
-    VEH_RANGE = ApiKey(key="range", cat=CAT.STATUS, jpath=["battery", "estimatedRange"])
-    VEH_SOCMIN = ApiKey(key="soc_min", cat=CAT.STATUS, jkey="userSettings", jvaluekey="online.vehicle.smartCharging.minChargeLimit")
-    VEH_SOCMAX = ApiKey(key="soc_max", cat=CAT.STATUS, jkey="userSettings", jvaluekey="online.vehicle.smartCharging.targetBatteryLevel")
+    VEH_SOC             = ApiKey(key="soc",                 jpath=["battery", "level"])
+    VEH_RANGE           = ApiKey(key="range",               jpath=["battery", "estimatedRange"])
+    VEH_SOCMIN          = ApiKey(key="soc_min",             jkey="userSettings", jvaluekey="online.vehicle.smartCharging.minChargeLimit")
+    VEH_SOCMAX          = ApiKey(key="soc_max",             jkey="userSettings", jvaluekey="online.vehicle.smartCharging.targetBatteryLevel")
+    VEH_CHARGING_STATUS = ApiKey(key="evcc_charging_code",  jkey="chargingStatus")
+    VEH_PIN_REQUIRED    = ApiKey(key="enter_pincode",       jkey="enterPincode")
+    VEH_ALIVE           = ApiKey(key="alive",               jkey="isAlive")

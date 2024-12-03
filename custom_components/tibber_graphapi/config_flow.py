@@ -9,7 +9,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from requests.exceptions import HTTPError, Timeout
 
 from custom_components.tibber_graphapi import TibberGraphApiBridge
-from .const import (
+from custom_components.tibber_graphapi.const import (
     DOMAIN,
     CONF_VEHINDEX_NUMBER,
     CONF_TIBBER_VEHICLE_ID,
