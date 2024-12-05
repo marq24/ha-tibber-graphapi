@@ -52,18 +52,22 @@ class TibberGraphApiBinarySensor(TibberGraphApiEntity, BinarySensorEntity):
                                     if item["key"] == self.entity_description.tag.jvaluekey:
                                         value = item["value"]
 
-        except (IndexError, ValueError, TypeError):
-            pass
+        except (IndexError, ValueError, TypeError) as ex:
+            _LOGGER.warning(f"Error for binary_sensor '{self.entity_description.key}': {ex}")
+            value = None
 
-        if not isinstance(value, bool):
-            if isinstance(value, str):
-                # parse anything else then 'on' to False!
-                if value.lower() == 'on':
-                    value = True
+        if value is not None:
+            if not isinstance(value, bool):
+                if isinstance(value, str):
+                    # parse anything else then 'on' to False!
+                    if value.lower() == 'on':
+                        value = True
+                    else:
+                        value = False
                 else:
                     value = False
-            else:
-                value = False
+        else:
+            value = False
 
         return value
 

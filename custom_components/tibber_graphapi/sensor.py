@@ -78,18 +78,25 @@ class TibberGraphApiSensor(TibberGraphApiEntity, SensorEntity, RestoreEntity):
 
                             # tibber graph api is very optimistic with charging status
                             if is_charging_status:
+                                isChargingFlag = self.coordinator.data["isCharging"]
                                 charging_obj = self.coordinator.data["charging"]
                                 has_charger_id = self.is_not_null(charging_obj["chargerId"])
                                 progress_obj = charging_obj["progress"]
                                 has_progress = self.is_not_null(progress_obj["cost"]) or self.is_not_null(progress_obj["energy"]) or self.is_not_null(progress_obj["speed"])
 
-                                if is_charging_status and (has_charger_id or has_progress):
+                                if is_charging_status and (isChargingFlag or has_charger_id or has_progress):
                                     return "C"
                                 else:
                                     # A or B ????
                                     return "B"
                             else:
-                                return "A"
+                                if charging_status == "not_charging":
+                                    return "B"
+                                elif charging_status == "disconnected":
+                                    return "A"
+
+                            # if we can not read any value, we return "A" as default
+                            return "A"
 
                     else:
                         # jpath is set ?! ["key1", "child2"]]
@@ -107,7 +114,7 @@ class TibberGraphApiSensor(TibberGraphApiEntity, SensorEntity, RestoreEntity):
                                         if item["key"] == self.entity_description.tag.jvaluekey:
                                             return item["value"]
 
-        except (IndexError, ValueError, TypeError):
-            pass
+        except (IndexError, ValueError, TypeError) as ex:
+            _LOGGER.warning(f"Error for sensor '{self.entity_description.key}': {ex}")
 
         return None
