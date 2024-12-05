@@ -34,6 +34,7 @@ class TibberGraphApiBinarySensor(TibberGraphApiEntity, BinarySensorEntity):
 
     @property
     def is_on(self) -> bool | None:
+        value = None
         try:
             if self.coordinator.data is not None:
                 if hasattr(self.entity_description, "tag"):
@@ -54,7 +55,6 @@ class TibberGraphApiBinarySensor(TibberGraphApiEntity, BinarySensorEntity):
 
         except (IndexError, ValueError, TypeError) as ex:
             _LOGGER.warning(f"Error for binary_sensor '{self.entity_description.key}': {ex}")
-            value = None
 
         if value is not None:
             if not isinstance(value, bool):
@@ -67,6 +67,7 @@ class TibberGraphApiBinarySensor(TibberGraphApiEntity, BinarySensorEntity):
                 else:
                     value = False
         else:
+            _LOGGER.warning(f"binary_sensor '{self.entity_description.key}' value is None")
             value = False
 
         return value
