@@ -25,9 +25,14 @@ Sounds complicated? - Yes, it is! - But it works!
 
 ![BeispielAnsicht](/sample-view.png)
 
+## Prerequisites
+
+- You must have **an active** Tibber account.
+- You must have used the Tibber (mobile) App to **add your Ford electrical vehicle** to your Tibber account / home
+
 ## Know Issues
 
-- Tibber GraphAPI only update SOC and range (and all other date), if vehicle is actually connected & charging... yes this SUCKS! - _Tibber claims they are working on it..._
+- Tibber GraphAPI only **update** SOC and range (and all other date), if vehicle is actually connected & charging... yes this SUCKS! - _Tibber claims they are working on it..._ This sounds a bit wired - but as long as you do not charge your car (elsewhere) the SOC will also not change. So this limitation should not be a big issue for users who charge their car at home.
 - EVCC charging status Code [A-F] are mainly guessed cause of inconsistent data from Tibber API
 - Probably you can do way more via the GraphAPI from Tibber - but for now I am only interested in the electrical vehicle part 
 - Probably very unstable - since it's the initial version
@@ -43,6 +48,8 @@ In order to speed up the support process you might like already prepare and prov
 - all handcrafted / reverse engineered by painstakingly analyzing the Tibber App and the Tibber API 
 
 ## Setup / Installation
+
+Please check the prerequisites before starting with the installation of this integration.
 
 ### Step I: Install the integration
 
