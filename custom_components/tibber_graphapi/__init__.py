@@ -1,8 +1,8 @@
 import asyncio
+import json
 import logging
 import re
 import uuid
-import json
 from datetime import timedelta
 from typing import Final
 
@@ -133,7 +133,6 @@ class TibberGraphApiDataUpdateCoordinator(DataUpdateCoordinator):
                 ("ID", self._vehicle_id),
             },
             "manufacturer": MANUFACTURE,
-            "suggested_area": "Basement",
             "name": f"Tibber GraphAPI {self._vehicle_name}"
         }
 
