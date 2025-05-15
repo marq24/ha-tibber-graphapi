@@ -6,7 +6,9 @@ import uuid
 from datetime import timedelta
 from typing import Final
 
+import aiohttp
 import voluptuous as vol
+from aiohttp import ClientConnectorError, ClientConnectionError
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_USERNAME, CONF_SCAN_INTERVAL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
@@ -249,8 +251,15 @@ class TibberGraphApiBridge:
     REQ_HEADERS = {
         "Accept-Language": "en",
         "x-tibber-new-ui": "true",
-        "User-Agent": "Tibber/24.46.0 (versionCode: 2446003Dalvik/2.1.0 (Linux; U; Android 11; sdk_gphone_x86_64 Build/RSR1.240422.006))",
+        "User-Agent": "Tibber/25.16.0 (versionCode: 2516001Dalvik/2.1.0 (Linux; U; Android 10; Android SDK built for x86_64 Build/QSR1.211112.011))",
         "Content-Type": "application/x-www-form-urlencoded"
+    }
+
+    REQ_HEADERS_WS = {
+        "Accept-Language": "en",
+        "x-tibber-new-ui": "true",
+        "User-Agent": "Tibber/25.16.0 (versionCode: 2516001Dalvik/2.1.0 (Linux; U; Android 10; Android SDK built for x86_64 Build/QSR1.211112.011))",
+        "Sec-WebSocket-Protocol": "graphql-transport-ws"
     }
 
     tibber_vehicleId = None
@@ -289,6 +298,7 @@ class TibberGraphApiBridge:
                 # ok updating the headers
                 self.REQ_HEADERS["Content-Type"] = "application/json; charset=utf-8"
                 self.REQ_HEADERS["Authorization"] = data["token"]
+                self.REQ_HEADERS_WS["Authorization"] = data["token"]
                 if "refreshToken" in data:
                     _LOGGER.debug(f"refreshToken received")
                     self._the_refresh_token = data["refreshToken"]
@@ -318,6 +328,7 @@ class TibberGraphApiBridge:
                     if ref_data is not None and "token" in ref_data:
                         self._require_refresh = False
                         self.REQ_HEADERS["Authorization"] = ref_data["token"]
+                        self.REQ_HEADERS_WS["Authorization"] = ref_data["token"]
                         if "refreshToken" in ref_data:
                             _LOGGER.debug(f"refreshToken updated !")
                             self._the_refresh_token = ref_data["refreshToken"]
@@ -328,14 +339,17 @@ class TibberGraphApiBridge:
                         _LOGGER.warning(f"no valid data in refresh token response: {ref_data} {ref_text}")
                         self._require_refresh = False
                         self.REQ_HEADERS.pop("Authorization")
+                        self.REQ_HEADERS_WS.pop("Authorization")
                 else:
                     _LOGGER.warning(f"refresh_token: {response.status} -> {response.reason}")
                     self._require_refresh = False
                     self.REQ_HEADERS.pop("Authorization")
+                    self.REQ_HEADERS_WS.pop("Authorization")
         else:
             _LOGGER.warning(f"refresh token was called but the 'refresh_token' is NONE")
             self._require_refresh = False
             self.REQ_HEADERS.pop("Authorization")
+            self.REQ_HEADERS_WS.pop("Authorization")
 
     async def get_vehicle_data(self) -> dict:
         if self._require_refresh:
@@ -364,6 +378,7 @@ class TibberGraphApiBridge:
                     _LOGGER.warning(f"no refresh token available - wait for next call to re-login...")
                     self._require_refresh = False
                     self.REQ_HEADERS.pop("Authorization")
+                    self.REQ_HEADERS_WS.pop("Authorization")
                 else:
                     _LOGGER.debug(f"refresh token available... try to refresh next...")
                     self._require_refresh = True
@@ -415,3 +430,123 @@ class TibberGraphApiBridge:
             self.get_vehicle_id()
             return None
         return self.tibber_vehicleName
+
+    async def get_pulse_ids(self):
+        if self._require_refresh:
+            await self.refresh_token()
+
+        if "Authorization" not in self.REQ_HEADERS:
+            await self.login()
+
+        if self.tibber_vehicleId is None or len(self.tibber_vehicleId) == 0:
+            await self.get_vehicle_id()
+
+        jdata = {"query": "query GizmoQuery { me { homes { id title gizmos {__typename ... on Gizmo {__typename ...GizmoItem} ... on GizmoGroup {id title gizmos {__typename ...GizmoItem}}}}}} fragment GizmoItem on Gizmo { id title type }"}
+
+        async with self._web_session.post(self.DATA_URL, json=jdata, headers=self.REQ_HEADERS) as response:
+            if response.status == 401:
+                _LOGGER.debug(f"401 received - trying to refresh auth token")
+                if self._the_refresh_token is None:
+                    _LOGGER.warning(f"no refresh token available - wait for next call to re-login...")
+                    self._require_refresh = False
+                    self.REQ_HEADERS.pop("Authorization")
+                    self.REQ_HEADERS_WS.pop("Authorization")
+                else:
+                    _LOGGER.debug(f"refresh token available... try to refresh next...")
+                    self._require_refresh = True
+
+            elif response.status == 200:
+                list_data = []
+                data = await response.json()
+                if "data" in data and "me" in data["data"]:
+                    obj = data["data"]["me"]
+                    if "homes" in obj and len(obj["homes"]) > 0:
+                        homes = obj["homes"]
+                        for home in homes:
+                            for gizmo in home.get("gizmos", []):
+                                if gizmo.get("type") == "REAL_TIME_METER":
+                                    list_data.append( gizmo.get("id") )
+
+                return list_data
+            else:
+                _LOGGER.warning(f"get_pulse_ids {response.status} -> {response.reason}")
+
+            # if we haven't read any data (cause of 401 or other status) we return None
+            return None
+
+    async def connect_ws(self):
+        if self._require_refresh:
+            await self.refresh_token()
+
+        if "Authorization" not in self.REQ_HEADERS_WS:
+            await self.login()
+
+        self.web_socket_url = "wss://app.tibber.com/v4/gql/ws"
+        # unique id for the subscription
+        pulse_subscribe_id = str(uuid.uuid4())
+
+        # unique id for the pulse device
+        self.my_pulse_id = "ID-IS-HERE"
+
+        try:
+            async with self._web_session.ws_connect(self.web_socket_url, headers=self.REQ_HEADERS_WS) as ws:
+                self.ws_connected = True
+                _LOGGER.info(f"connected to websocket: {self.web_socket_url}")
+                await ws.send_json({"type": "connection_init"})
+                async for msg in ws:
+                    if msg.type == aiohttp.WSMsgType.TEXT:
+                        try:
+                            data = msg.json()
+                            if "type" in data:
+                                if data["type"] == "connection_ack":
+                                    # we can/should subscribe...
+                                    await ws.send_json(
+                                        {
+                                            "type": "subscribe",
+                                            "id": pulse_subscribe_id,
+                                            "payload": {
+                                                "operationName": "pulseSubscription",
+                                                "variables": {"deviceId": self.my_pulse_id},
+                                                "query": "subscription pulseSubscription($deviceId: String!) { liveMeasurement(deviceId: $deviceId) { __typename ...RealTimeMeasurement } }  fragment RealTimeMeasurement on PulseMeasurement { timestamp power powerProduction minPower minPowerTimestamp averagePower maxPower maxPowerTimestamp minPowerProduction maxPowerProduction estimatedAccumulatedConsumptionCurrentHour accumulatedConsumption accumulatedCost accumulatedConsumptionCurrentHour accumulatedProduction accumulatedReward accumulatedProductionCurrentHour peakControlConsumptionState currency currentPhase1 currentPhase2 currentPhase3 voltagePhase1 voltagePhase2 voltagePhase3 powerFactor signalStrength }"
+                                            }
+                                        }
+                                    )
+
+                                elif data["type"] == "ka":
+                                    _LOGGER.debug(f"keep alive? {data}")
+
+                                elif data["type"] == "next":
+                                    if "id" in data and data["id"] == pulse_subscribe_id:
+                                        if "payload" in data and "data" in data["payload"]:
+                                            if "liveMeasurement" in data["payload"]["data"]:
+                                                keys_and_values = data["payload"]["data"]["liveMeasurement"]
+                                                if "__typename" in keys_and_values and keys_and_values["__typename"] == "PulseMeasurement":
+                                                    del keys_and_values["__typename"]
+                                                    _LOGGER.debug(f"THE DATA {keys_and_values}")
+                                                    self._data = keys_and_values
+                                                    #{'accumulatedConsumption': 5.7841, 'accumulatedConsumptionCurrentHour': 0.0646, 'accumulatedCost': 1.952497, 'accumulatedProduction': 48.4389, 'accumulatedProductionCurrentHour': 0, 'accumulatedReward': None, 'averagePower': 261.3, 'currency': 'EUR', 'currentPhase1': None, 'currentPhase2': None, 'currentPhase3': None, 'estimatedAccumulatedConsumptionCurrentHour': None, 'maxPower': 5275, 'maxPowerProduction': 6343, 'maxPowerTimestamp': '2025-05-15T06:41:45.000+02:00', 'minPower': 0, 'minPowerProduction': 0, 'minPowerTimestamp': '2025-05-15T20:31:34.000+02:00', 'peakControlConsumptionState': None, 'power': 467, 'powerFactor': None, 'powerProduction': 0, 'signalStrength': None, 'timestamp': '2025-05-15T22:08:11.000+02:00', 'voltagePhase1': None, 'voltagePhase2': None, 'voltagePhase3': None}
+
+                                else:
+                                    _LOGGER.debug(f"unknown DATA {data}")
+
+                        except Exception as e:
+                            _LOGGER.debug(f"Could not read JSON from: {msg} - caused {e}")
+                    elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                        _LOGGER.debug(f"received: {msg}")
+                        break
+                    else:
+                        _LOGGER.error(f"xxx: {msg}")
+
+        except ClientConnectorError as con:
+            _LOGGER.error(f"Could not connect to websocket: {con}")
+        except ClientConnectionError as err:
+            _LOGGER.error(f"???: {err}")
+        except BaseException as x:
+            _LOGGER.error(f"!!!: {x}")
+
+        self.ws_connected = False
+
+    async def _debounce_coordinator_update(self):
+        await asyncio.sleep(0.3)
+        if self.coordinator is not None:
+            self.coordinator.async_set_updated_data(self._data)
