@@ -272,6 +272,9 @@ class TibberGraphApiBridge:
     _pwd = None
     _veh_index = 0
 
+    tibber_pulseId = None
+    tibber_meterId = None
+
     def __init__(self, user, pwd, a_web_session, veh_index: int = 0, veh_id: str = None, options: dict = None):
         if a_web_session is not None:
             _LOGGER.info(f"restarting TibberGraphApi integration... for tibber-vehicle-id: '{veh_id}' vehicle-index: '{veh_index}' with options: {options}")
@@ -438,8 +441,14 @@ class TibberGraphApiBridge:
         if "Authorization" not in self.REQ_HEADERS:
             await self.login()
 
-        if self.tibber_vehicleId is None or len(self.tibber_vehicleId) == 0:
-            await self.get_vehicle_id()
+        # query GetHomes { me { homes { __typename ...HomeItem } } }
+        # fragment CurrentMeterItem on CurrentMeter { id meterNo isUserRead }
+        # fragment HomeItem on Home { id timeZone hasSmartMeterCapabilities profileQuestionsCompletedInPercent hasSignedEnergyDeal hasConsumption showMeterNo showMeteringPointId currentMeter { __typename ...CurrentMeterItem } avatar title type }
+        # ->
+        # query GetHomes { me { homes { id timeZone hasSmartMeterCapabilities hasSignedEnergyDeal hasConsumption showMeterNo showMeteringPointId currentMeter { id meterNo isUserRead } avatar title type } } }
+        #
+        # ONLY ONE HOME
+        # query GetHomes { me { home(id:"f320a86d-f558-450c-b042-80c9e2fa6ab1") { id timeZone hasSmartMeterCapabilities hasSignedEnergyDeal hasConsumption showMeterNo showMeteringPointId currentMeter { id meterNo isUserRead } avatar title type } } }
 
         jdata = {"query": "query GizmoQuery { me { homes { id title gizmos {__typename ... on Gizmo {__typename ...GizmoItem} ... on GizmoGroup {id title gizmos {__typename ...GizmoItem}}}}}} fragment GizmoItem on Gizmo { id title type }"}
 
@@ -467,6 +476,11 @@ class TibberGraphApiBridge:
                                 if gizmo.get("type") == "REAL_TIME_METER":
                                     list_data.append( gizmo.get("id") )
 
+                if len(list_data) > 0:
+                    # we have a list of ids
+                    _LOGGER.debug(f"found {len(list_data)} pulse ids: {list_data}")
+                    self.tibber_pulseId = list_data[0]
+
                 return list_data
             else:
                 _LOGGER.warning(f"get_pulse_ids {response.status} -> {response.reason}")
@@ -481,12 +495,12 @@ class TibberGraphApiBridge:
         if "Authorization" not in self.REQ_HEADERS_WS:
             await self.login()
 
+        if self.tibber_pulseId is None or len(self.tibber_pulseId) == 0:
+            await self.get_pulse_ids()
+
         self.web_socket_url = "wss://app.tibber.com/v4/gql/ws"
         # unique id for the subscription
         pulse_subscribe_id = str(uuid.uuid4())
-
-        # unique id for the pulse device
-        self.my_pulse_id = "ID-IS-HERE"
 
         try:
             async with self._web_session.ws_connect(self.web_socket_url, headers=self.REQ_HEADERS_WS) as ws:
@@ -500,20 +514,27 @@ class TibberGraphApiBridge:
                             if "type" in data:
                                 if data["type"] == "connection_ack":
                                     # we can/should subscribe...
+                                    # the values 'lastMeterProduction' & 'lastMeterConsumption' are not present in the
+                                    # v4 PulseMeasurement / RealTimeMeasurement Objects ?!
                                     await ws.send_json(
                                         {
                                             "type": "subscribe",
                                             "id": pulse_subscribe_id,
                                             "payload": {
                                                 "operationName": "pulseSubscription",
-                                                "variables": {"deviceId": self.my_pulse_id},
-                                                "query": "subscription pulseSubscription($deviceId: String!) { liveMeasurement(deviceId: $deviceId) { __typename ...RealTimeMeasurement } }  fragment RealTimeMeasurement on PulseMeasurement { timestamp power powerProduction minPower minPowerTimestamp averagePower maxPower maxPowerTimestamp minPowerProduction maxPowerProduction estimatedAccumulatedConsumptionCurrentHour accumulatedConsumption accumulatedCost accumulatedConsumptionCurrentHour accumulatedProduction accumulatedReward accumulatedProductionCurrentHour peakControlConsumptionState currency currentPhase1 currentPhase2 currentPhase3 voltagePhase1 voltagePhase2 voltagePhase3 powerFactor signalStrength }"
+                                                "variables": {"deviceId": self.tibber_pulseId},
+                                                "query": "subscription pulseSubscription($deviceId: String!) { liveMeasurement(deviceId: $deviceId) { __typename ...RealTimeMeasurement } }  fragment RealTimeMeasurement on PulseMeasurement { timestamp power powerProduction minPower minPowerTimestamp averagePower maxPower maxPowerTimestamp minPowerProduction maxPowerProduction estimatedAccumulatedConsumptionCurrentHour accumulatedConsumption accumulatedCost accumulatedConsumptionCurrentHour accumulatedProduction accumulatedReward accumulatedProductionCurrentHour peakControlConsumptionState currency currentPhase1 currentPhase2 currentPhase3 voltagePhase1 voltagePhase2 voltagePhase3 powerFactor signalStrength}"
                                             }
                                         }
                                     )
 
                                 elif data["type"] == "ka":
                                     _LOGGER.debug(f"keep alive? {data}")
+
+                                elif data["type"] == "complete":
+                                    if "id" in data and data["id"] == pulse_subscribe_id:
+                                        # it looks like that the subscription ended (and we should re-subscribe)
+                                        pass
 
                                 elif data["type"] == "next":
                                     if "id" in data and data["id"] == pulse_subscribe_id:
@@ -525,6 +546,12 @@ class TibberGraphApiBridge:
                                                     _LOGGER.debug(f"THE DATA {keys_and_values}")
                                                     self._data = keys_and_values
                                                     #{'accumulatedConsumption': 5.7841, 'accumulatedConsumptionCurrentHour': 0.0646, 'accumulatedCost': 1.952497, 'accumulatedProduction': 48.4389, 'accumulatedProductionCurrentHour': 0, 'accumulatedReward': None, 'averagePower': 261.3, 'currency': 'EUR', 'currentPhase1': None, 'currentPhase2': None, 'currentPhase3': None, 'estimatedAccumulatedConsumptionCurrentHour': None, 'maxPower': 5275, 'maxPowerProduction': 6343, 'maxPowerTimestamp': '2025-05-15T06:41:45.000+02:00', 'minPower': 0, 'minPowerProduction': 0, 'minPowerTimestamp': '2025-05-15T20:31:34.000+02:00', 'peakControlConsumptionState': None, 'power': 467, 'powerFactor': None, 'powerProduction': 0, 'signalStrength': None, 'timestamp': '2025-05-15T22:08:11.000+02:00', 'voltagePhase1': None, 'voltagePhase2': None, 'voltagePhase3': None}
+
+                                elif data["type"] == "error":
+                                    if "payload" in data:
+                                        _LOGGER.warning(f"error {data["payload"]}")
+                                    else:
+                                        _LOGGER.warning(f"error {data}")
 
                                 else:
                                     _LOGGER.debug(f"unknown DATA {data}")
