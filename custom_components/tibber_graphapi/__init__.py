@@ -565,11 +565,11 @@ class TibberGraphApiBridge:
                         _LOGGER.error(f"xxx: {msg}")
 
         except ClientConnectorError as con:
-            _LOGGER.error(f"Could not connect to websocket: {con}")
+            _LOGGER.error(f"Could not connect to websocket: {type(con)} - {con}")
         except ClientConnectionError as err:
-            _LOGGER.error(f"???: {err}")
+            _LOGGER.error(f"???: {type(err)} - {err}")
         except BaseException as x:
-            _LOGGER.error(f"!!!: {x}")
+            _LOGGER.error(f"!!!: {type(x)} - {x}")
 
         self.ws_connected = False
 
