@@ -11,7 +11,6 @@ from custom_components.tibber_graphapi.const import (
     DOMAIN,
     SENSOR_TYPES
 )
-
 from custom_components.tibber_graphapi.tags import TGATag
 
 _LOGGER = logging.getLogger(__name__)
@@ -29,8 +28,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
 
 
 class TibberGraphApiSensor(TibberGraphApiEntity, SensorEntity, RestoreEntity):
-    def __init__(self, a_coordinator: TibberGraphApiDataUpdateCoordinator, a_description: SensorEntityDescription):
-        super().__init__(coordinator=a_coordinator, description=a_description)
+    def __init__(self, a_coordinator: TibberGraphApiDataUpdateCoordinator, description: SensorEntityDescription):
+        super().__init__(coordinator=a_coordinator, description=description)
 
     def get_value_in_path(self, data, keys):
         return self.get_value_in_path(data[keys[0]], keys[1:]) if keys else data
