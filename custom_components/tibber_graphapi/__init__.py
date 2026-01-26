@@ -8,7 +8,7 @@ from typing import Final
 
 import aiohttp
 import voluptuous as vol
-from aiohttp import ClientConnectorError, ClientConnectionError
+from aiohttp import ClientConnectionError
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import CONF_USERNAME, CONF_SCAN_INTERVAL, CONF_PASSWORD
 from homeassistant.core import HomeAssistant
@@ -564,10 +564,8 @@ class TibberGraphApiBridge:
                     else:
                         _LOGGER.error(f"xxx: {msg}")
 
-        except ClientConnectorError as con:
-            _LOGGER.error(f"Could not connect to websocket: {type(con)} - {con}")
         except ClientConnectionError as err:
-            _LOGGER.error(f"???: {type(err)} - {err}")
+            _LOGGER.error(f"Could not connect to websocket: {type(err)} - {err}")
         except BaseException as x:
             _LOGGER.error(f"!!!: {type(x)} - {x}")
 
