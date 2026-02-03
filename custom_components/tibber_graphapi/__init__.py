@@ -192,7 +192,7 @@ class TibberGraphApiEntity(Entity):
     def __init__(self, coordinator: TibberGraphApiDataUpdateCoordinator, description: EntityDescription) -> None:
         self.entity_description = description
         self.coordinator = coordinator
-        self.entity_id = f"{DOMAIN}.{_camel_to_snake(self.coordinator._vehicle_name)}_{_camel_to_snake(description.key)}"
+        self.entity_id = f"{DOMAIN}.{_camel_to_snake(self.coordinator._vehicle_name)}_{_camel_to_snake(description.key)}".lower()
 
         if hasattr(description, "translation_key") and description.translation_key is not None:
             self._attr_translation_key = description.translation_key.lower()
@@ -226,7 +226,7 @@ class TibberGraphApiEntity(Entity):
     @property
     def unique_id(self):
         """Return a unique ID to use for this entity."""
-        return self.entity_id
+        return self.entity_id.lower()
 
     async def async_added_to_hass(self):
         """Connect to dispatcher listening for entity data notifications."""
