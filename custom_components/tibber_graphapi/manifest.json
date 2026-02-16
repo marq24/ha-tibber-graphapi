@@ -7,6 +7,7 @@
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/marq24/ha-tibber-graphapi/blob/master/README.md",
+  "integration_type": "device",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/marq24/ha-tibber-graphapi/issues",
   "version": "2024.12.0"
